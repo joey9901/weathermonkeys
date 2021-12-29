@@ -1,8 +1,22 @@
-import 'settings_page.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'dart:async';
+
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
-import 'package:charts_flutter/flutter.dart' as charts;
+import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart';
+
 
 void main() => runApp(WeatherMonkeysApp());
+
+// creating the custom color (base color) for the app
+Map<int, Color> color ={50:Color.fromRGBO(136,14,79, .1),100:Color.fromRGBO(136,14,79, .2),200:Color.fromRGBO(136,14,79, .3),300:Color.fromRGBO(136,14,79, .4),400:Color.fromRGBO(136,14,79, .5),500:Color.fromRGBO(136,14,79, .6),600:Color.fromRGBO(136,14,79, .7),700:Color.fromRGBO(136,14,79, .8),800:Color.fromRGBO(136,14,79, .9),900:Color.fromRGBO(136,14,79, 1),};
+MaterialColor colorCustom = MaterialColor(0xFF115363, color);
+
 
 // Main App (Stateless)
 class WeatherMonkeysApp extends StatelessWidget {
@@ -11,12 +25,13 @@ class WeatherMonkeysApp extends StatelessWidget {
     return MaterialApp(
       title: 'Weather Monkeys',
       theme: ThemeData(
-        primarySwatch: Colors.deepPurple,
+        primarySwatch: colorCustom,
       ),
       home: MyHomePage(title: 'Graph Screen'),
     );
   }
 }
+
 
 // HomePage with State (Stateful)
 class MyHomePage extends StatefulWidget {
@@ -28,221 +43,1024 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
+Future getData(String table, String date) async {
+  date = Uri.encodeComponent(date);
+  final response = await http.get(
+      Uri.parse("http://217.123.63.98/test3.php?table=${table}&date=${date}"),
+          headers: {
+            "Accept": "application/json",
+            "Access-Control_Allow_Origin": "*"
+          });
+
+  if(response.statusCode == 200) {
+
+    print(response.body);
+
+    var jsonresponse = response.body;
+    List<dynamic> decodedjson = jsonDecode(jsonresponse);
+
+    // if (table == "lopy" || table == "dragino") {
+    //   for (var i in decodedjson) {
+    //     print('${i["received_time"]}');
+    //   }
+    // } else {
+    //   print('${decodedjson}');
+    // }
+
+    return decodedjson;
+
+  } else {
+    throw Exception('Bad response');
+  }
+}
+
+Future<List> parse_lopy_temperature(String table, String date) async {
+  List decodedjson = await getData(table, date);
+  List<String> timeList = [];
+  List<double> temperatureList = [];
+  for (var i in decodedjson){
+    timeList.add(i["received_time"]);
+    double temperature = double.parse(i["temperature"]);
+    temperatureList.add(temperature);
+    TempData(i["received_time"], temperature);
+  }
+  return await [timeList, temperatureList];
+}
+
 // Home Page State
 class _MyHomePageState extends State<MyHomePage> {
 
-  //int interval_to_display = 365;
+  int _selectedPage = 0;
 
-  // List + Addition for Temperature Sensor Data
-  List<lopy_sensor> temperature_sensor = [/*interval_to_display*/]; // blank initially
+  final PageController _pageController = PageController(
+  );
 
-  List<lopy_sensor> _createTemperatureDataList() {
-  temperature_sensor.add(new lopy_sensor(new DateTime.now(), parse_lopy_temperature()));
-  return temperature_sensor;
-  }
-
-  // List + Addition for Light Sensor Data
-  List<lopy_sensor> light_sensor = [/*interval_to_display*/]; // blank initially
-
-  List<lopy_sensor> _createLightDataList() {
-  temperature_sensor.add(new lopy_sensor(new DateTime.now(), parse_lopy_light()));
-  return pressure_sensor;
-  }
-
-  // List + Addition Function for Pressure Sensor Data
-  List<lopy_sensor> pressure_sensor = [/*interval_to_display*/]; // blank initially
-
-  List<lopy_sensor> _createPressureDataList() {
-  temperature_sensor.add(new lopy_sensor(new DateTime.now(), parse_lopy_pressure()));
-  return pressure_sensor;
-  }
-
-  // Refresh State function
-  void _refreshData(/*int m_interval*/) {
+  void _changePage(int pageNum) {
     setState(() {
-      _createTemperatureDataList();
-      _createLightDataList();
-      _createPressureDataList();
-      //interval_to_display = m_interval;
-    });
+      _selectedPage = pageNum;
+      _pageController.jumpToPage(pageNum);
+    }
+    );
   }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+
+  String dropdownValue = 'Hour';
 
   // Home Page State Widget
   @override
   Widget build(BuildContext context)
   {
-    // Generating list of Graph Series to display
-    List<charts.Series<lopy_sensor, DateTime>> _createSampleData()
-    {
-      final temperature_data = _createTemperatureDataList();
+    String date = "2021-12-25 10:00:00";
+    parse_lopy_temperature("lopy", date);
 
-      final light_data = _createLightDataList();
+    final List<TempData> tempData = [
+      TempData("Monday", 5.5),
+      TempData("Tuesday", 8.5),
+      TempData("Wednesday", 6.5),
+      TempData("Thursday", 8.5),
+      TempData("Friday", 2.5),
+    ];
 
-      final pressure_data = _createPressureDataList();
+    final List<LightData> lightData = [
+      LightData("Monday", 80),
+      LightData("Tuesday", 85),
+      LightData("Wednesday", 75),
+      LightData("Thursday", 95),
+      LightData("Friday", 90),
+    ];
 
-      return [
-        new charts.Series(
-          id: 'Temperature',
-          colorFn: (_, __) => charts.MaterialPalette.purple.shadeDefault,
-          areaColorFn: (_, __) => charts.MaterialPalette.purple.shadeDefault.lighter,
-          domainFn: (lopy_sensor lopy, _) => lopy.m_time,
-          measureFn: (lopy_sensor lopy, _) => lopy.m_sensorData,
-          data: temperature_data,
-        ),
-        // new charts.Series(
-        //   id: 'Light',
-        //   colorFn: (_, __) => charts.MaterialPalette.yellow.shadeDefault,
-        //   areaColorFn: (_, __) => charts.MaterialPalette.yellow.shadeDefault.lighter,
-        //   domainFn: (lopy_sensor lopy, _) => lopy.m_time,
-        //   measureFn: (lopy_sensor lopy, _) => lopy.m_sensorData,
-        //   data: light_data,
-        // ),
-        new charts.Series(
-          id: 'Pressure',
-          colorFn: (_, __) => charts.MaterialPalette.purple.shadeDefault,
-          areaColorFn: (_, __) => charts.MaterialPalette.purple.shadeDefault.lighter,
-          domainFn: (lopy_sensor lopy, _) => lopy.m_time,
-          measureFn: (lopy_sensor lopy, _) => lopy.m_sensorData,
-          data: pressure_data,
-        ),
-      ];
-    }
-    var chart = charts.TimeSeriesChart(_createSampleData(), animate: true, defaultRenderer: new charts.LineRendererConfig(includeArea: true, stacked: true), dateTimeFactory: const charts.LocalDateTimeFactory(),);
-    // Creating Chart Child-Widget
-    var chartWidget = Padding(
-      padding: EdgeInsets.all(32.0),
-      child: SizedBox(
-        height: 400.0,
-        child: chart,
-      ),
-    );
+    final List<PressureData> pressureData = [
+      PressureData("Monday", 1013.25),
+      PressureData("Tuesday", 1040.15),
+      PressureData("Wednesday", 1039),
+      PressureData("Thursday", 1035),
+      PressureData("Friday", 1036),
+    ];
+
+    final List<HumData> humData = [
+      HumData("Monday", 96),
+      HumData("Tuesday", 90),
+      HumData("Wednesday", 87),
+      HumData("Thursday", 76),
+      HumData("Friday", 83),
+    ];
+
 
     // Returning Appbar as a Widget for our Home Page
     return Scaffold(
       appBar: AppBar(
-        title: Text("Weather Monkeys", style: TextStyle(color: Colors.white)),
+        title: Text(
+            "Weather Monkeys",
+            style: GoogleFonts.nunito(textStyle: TextStyle(color: Color(0xFFF7F7F7), fontSize: 25))),
         actions: <Widget>[
-          FlatButton(
-            onPressed: () {
-              Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (BuildContext context) => SettingsPage()), (Route<dynamic> route) => false);
-            },
-            child: Text("Change Settings", style: TextStyle(color: Colors.white)),
-          ),
         ],
       ),
       body:
       Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-                colors: [Colors.white70, Colors.deepPurple],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter),
-          ),
-          child:
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: <Widget>[
-              chartWidget,
-              Row(
-                children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.all(60),
-                    child:  RaisedButton(
-                      padding: const EdgeInsets.symmetric(horizontal: 165),
-                      child: new Text("Hour"),
-                      onPressed: _refreshData,
-                      color:  Colors.deepPurple,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(60),
-                    child:  RaisedButton(
-                      padding: const EdgeInsets.symmetric(horizontal: 165),
-                      child: new Text("Day"),
-                      onPressed: _refreshData,
-                      color:  Colors.deepPurple,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.all(60),
-                    child:  RaisedButton(
-                      padding: const EdgeInsets.symmetric(horizontal: 165),
-                      child: new Text("Month"),
-                      onPressed: _refreshData,
-                      color:  Colors.deepPurple,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(60),
-                    child:  RaisedButton(
-                      padding: const EdgeInsets.symmetric(horizontal: 160),
-                      child: new Text("Year"),
-                      onPressed: _refreshData,
-                      color:  Colors.deepPurple,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          child: Column(
+              children: [
+                Container(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+
+                      ),
+                      child:
+                      Row(
+                        //children: <Widget>[
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Padding(
+                              padding: const EdgeInsets.fromLTRB(15, 15, 0, 0),
+                              child:
+                              Container(
+                                decoration: BoxDecoration(
+                                  //color:  Color(0xFFF7F7F7),
+                                  borderRadius: BorderRadius.only(topLeft: Radius.circular(5), bottomLeft: Radius.circular(5)),
+                                ),
+                                child:
+                                TabButton(
+                                  text: "Temperature",
+                                  pageNumber: 0,
+                                  selectedPage: _selectedPage,
+                                  onPressed: (){
+                                    _changePage(0);
+                                  },
+
+                                ),
+                              )
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 15, 0, 0),
+                            child:
+                            Container(
+                              decoration: BoxDecoration(
+
+                              ),
+                              child:
+                              TabButton(
+                                text: "Light",
+                                pageNumber: 1,
+                                selectedPage: _selectedPage,
+                                onPressed: (){
+                                  _changePage(1);
+                                },
+
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 15, 0, 0),
+                            child:
+                            Container(
+                              decoration: BoxDecoration(
+
+                              ),
+                              child:
+                              TabButton(
+                                  text: "Pressure",
+                                  pageNumber: 2,
+                                  selectedPage: _selectedPage,
+                                  onPressed: (){
+                                    _changePage(2);
+                                  }
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 15, 10, 0),
+                            child:
+                            Container(
+                              decoration: BoxDecoration(
+
+                              ),
+                              child:
+                              TabButton(
+                                text: "Humidity",
+                                pageNumber: 3,
+                                selectedPage: _selectedPage,
+                                onPressed: (){
+                                  _changePage(3);
+                                },
+                              ),
+                            ),
+                          ),
+
+                          Padding(
+                              padding: const EdgeInsets.fromLTRB(80, 15, 30, 0),
+
+                              child: DropdownButton<String>(
+                                value: dropdownValue,
+                                icon: const Icon(Icons.expand_more),
+                                elevation: 10,
+                                style: GoogleFonts.nunito(textStyle: TextStyle(color: colorCustom, fontSize: 15, fontWeight: FontWeight.bold)),
+                                underline: Container(
+                                  height: 1,
+                                  color: Colors.grey,
+                                ),
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    dropdownValue = newValue!;
+                                  });
+                                },
+                                items: <String>['Hour', 'Day', 'Week', 'Custom']
+                                    .map<DropdownMenuItem<String>>((String value) {
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  );
+                                }).toList(),
+                              )
+                          ),
+                      ]),
+                    )
+                ),
+                Expanded(
+                    child:
+                    PageView(
+                        onPageChanged: (int page) {
+                          setState(() {
+                            _selectedPage = page;
+                          });
+                        },
+                        controller: _pageController,
+                        scrollDirection: Axis.vertical,
+                        children: [
+
+                          Container(
+                              child:
+                              Row(
+                                  children: [
+                                    Expanded(
+                                      child:
+                                      Container(
+                                        padding: EdgeInsets.all(15),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                        ),
+                                        child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white70,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: SfCartesianChart(
+                                                margin: EdgeInsets.all(30),
+                                                primaryXAxis: CategoryAxis(),
+                                                title: ChartTitle(
+                                                    text: 'Temperature data \n',
+                                                    alignment: ChartAlignment.near,
+                                                    textStyle: TextStyle(
+                                                      color: colorCustom,
+                                                      fontFamily: 'Roboto',
+                                                      //fontStyle: FontStyle.,
+                                                      fontSize: 18,
+                                                    )
+                                                ),
+                                                series: <ChartSeries>[
+                                                  // Renders line chart
+                                                  LineSeries<TempData, String>(
+                                                    markerSettings: MarkerSettings(
+                                                      borderWidth: 3,
+                                                    ),
+                                                    dataSource: tempData,
+                                                    xValueMapper: (TempData temp, _) => temp.day,
+                                                    yValueMapper: (TempData temp, _) => temp.temp,
+                                                    color: colorCustom,
+                                                  )
+                                                ]
+                                            )
+                                        ),
+                                      ),
+                                    ),
+                                    Column(
+                                      children: [
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Light data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<LightData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: lightData,
+                                                        xValueMapper: (LightData light, _) => light.day,
+                                                        yValueMapper: (LightData light, _) => light.light,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Pressure data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<PressureData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: pressureData,
+                                                        xValueMapper: (PressureData pressure, _) => pressure.day,
+                                                        yValueMapper: (PressureData pressure, _) => pressure.pressure,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Humidity data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<HumData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: humData,
+                                                        xValueMapper: (HumData hum, _) => hum.day,
+                                                        yValueMapper: (HumData hum, _) => hum.hum,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  ]
+
+                              )
+                          ),
+                          Container(
+                              child:
+                              Row(
+                                  children: [
+                                    Expanded(
+                                      child:
+                                      Container(
+                                        padding: EdgeInsets.all(15),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                        ),
+                                        child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white70,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: SfCartesianChart(
+                                                margin: EdgeInsets.all(30),
+                                                primaryXAxis: CategoryAxis(),
+                                                title: ChartTitle(
+                                                    text: 'Light data\n',
+                                                    alignment: ChartAlignment.near,
+                                                    textStyle: TextStyle(
+                                                      color: colorCustom,
+                                                      fontFamily: 'Roboto',
+                                                      //fontStyle: FontStyle.,
+                                                      fontSize: 18,
+                                                    )
+                                                ),
+                                                series: <ChartSeries>[
+                                                  // Renders line chart
+                                                  LineSeries<LightData, String>(
+                                                    markerSettings: MarkerSettings(
+                                                      borderWidth: 3,
+                                                    ),
+                                                    dataSource: lightData,
+                                                    xValueMapper: (LightData light, _) => light.day,
+                                                    yValueMapper: (LightData light, _) => light.light,
+                                                    color: colorCustom,
+                                                  )
+                                                ]
+                                            )
+                                        ),
+                                      ),
+                                    ),
+                                    Column(
+                                      children: [
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Temperature data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<TempData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: tempData,
+                                                        xValueMapper: (TempData temp, _) => temp.day,
+                                                        yValueMapper: (TempData temp, _) => temp.temp,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Pressure data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<PressureData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: pressureData,
+                                                        xValueMapper: (PressureData pressure, _) => pressure.day,
+                                                        yValueMapper: (PressureData pressure, _) => pressure.pressure,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Humidity data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<HumData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: humData,
+                                                        xValueMapper: (HumData hum, _) => hum.day,
+                                                        yValueMapper: (HumData hum, _) => hum.hum,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  ]
+
+                              )
+                          ),
+                          Container(
+                              child:
+                              Row(
+                                  children: [
+                                    Expanded(
+                                      child:
+                                      Container(
+                                        padding: EdgeInsets.all(15),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                        ),
+                                        child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white70,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: SfCartesianChart(
+                                                margin: EdgeInsets.all(30),
+                                                primaryXAxis: CategoryAxis(),
+                                                title: ChartTitle(
+                                                    text: 'Pressure \n',
+                                                    alignment: ChartAlignment.near,
+                                                    textStyle: TextStyle(
+                                                      color: colorCustom,
+                                                      fontFamily: 'Roboto',
+                                                      //fontStyle: FontStyle.,
+                                                      fontSize: 18,
+                                                    )
+                                                ),
+                                                series: <ChartSeries>[
+                                                  // Renders line chart
+                                                  LineSeries<PressureData, String>(
+                                                    markerSettings: MarkerSettings(
+                                                      borderWidth: 3,
+                                                    ),
+                                                    dataSource: pressureData,
+                                                    xValueMapper: (PressureData pressure, _) => pressure.day,
+                                                    yValueMapper: (PressureData pressure, _) => pressure.pressure,
+                                                    color: colorCustom,
+                                                  )
+                                                ]
+                                            )
+                                        ),
+                                      ),
+                                    ),
+                                    Column(
+                                      children: [
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Temperature data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<TempData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: tempData,
+                                                        xValueMapper: (TempData temp, _) => temp.day,
+                                                        yValueMapper: (TempData temp, _) => temp.temp,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Light data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<LightData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: lightData,
+                                                        xValueMapper: (LightData light, _) => light.day,
+                                                        yValueMapper: (LightData light, _) => light.light,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Humidity data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<HumData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: humData,
+                                                        xValueMapper: (HumData hum, _) => hum.day,
+                                                        yValueMapper: (HumData hum, _) => hum.hum,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  ]
+
+                              )
+                          ),
+                          Container(
+                              child:
+                              Row(
+                                  children: [
+                                    Expanded(
+                                      child:
+                                      Container(
+                                        padding: EdgeInsets.all(15),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                        ),
+                                        child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white70,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: SfCartesianChart(
+                                                margin: EdgeInsets.all(30),
+                                                primaryXAxis: CategoryAxis(),
+                                                title: ChartTitle(
+                                                    text: 'Humidity data \n',
+                                                    alignment: ChartAlignment.near,
+                                                    textStyle: TextStyle(
+                                                      color: colorCustom,
+                                                      fontFamily: 'Roboto',
+                                                      //fontStyle: FontStyle.,
+                                                      fontSize: 18,
+                                                    )
+                                                ),
+                                                series: <ChartSeries>[
+                                                  // Renders line chart
+                                                  LineSeries<HumData, String>(
+                                                    markerSettings: MarkerSettings(
+                                                      borderWidth: 3,
+                                                    ),
+                                                    dataSource: humData,
+                                                    xValueMapper: (HumData hum, _) => hum.day,
+                                                    yValueMapper: (HumData hum, _) => hum.hum,
+                                                    color: colorCustom,
+                                                  )
+                                                ]
+                                            )
+                                        ),
+                                      ),
+                                    ),
+                                    Column(
+                                      children: [
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Temperature data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<TempData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: tempData,
+                                                        xValueMapper: (TempData temp, _) => temp.day,
+                                                        yValueMapper: (TempData temp, _) => temp.temp,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Light data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<LightData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: lightData,
+                                                        xValueMapper: (LightData light, _) => light.day,
+                                                        yValueMapper: (LightData light, _) => light.light,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child:
+                                          Container(
+                                            padding: EdgeInsets.all(15),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                            ),
+                                            child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white70,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: SfCartesianChart(
+                                                    margin: EdgeInsets.all(10),
+                                                    primaryXAxis: CategoryAxis(),
+                                                    title: ChartTitle(
+                                                        text: 'Pressure data',
+                                                        alignment: ChartAlignment.near,
+                                                        textStyle: TextStyle(
+                                                          color: colorCustom,
+                                                          fontFamily: 'Roboto',
+                                                          //fontStyle: FontStyle.,
+                                                          fontSize: 11,
+                                                        )
+                                                    ),
+                                                    series: <ChartSeries>[
+                                                      // Renders line chart
+                                                      LineSeries<PressureData, String>(
+                                                        markerSettings: MarkerSettings(
+                                                          borderWidth: 3,
+                                                        ),
+                                                        dataSource: pressureData,
+                                                        xValueMapper: (PressureData pressure, _) => pressure.day,
+                                                        yValueMapper: (PressureData pressure, _) => pressure.pressure,
+                                                        color: colorCustom,
+                                                      )
+                                                    ]
+                                                )
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  ]
+
+                              )
+                          )
+
+                        ]
+                    )
+                )
+              ]
+          )
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _refreshData,
-        tooltip: 'Refresh Data',
-        child: Icon(Icons.refresh),
+
+    );
+  }
+}
+
+class TabButton extends StatelessWidget{
+  final String? text;
+  final int? selectedPage;
+  final int? pageNumber;
+  final void Function()? onPressed;
+  TabButton({this.text, this.selectedPage, this.pageNumber, this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        decoration: BoxDecoration(
+          color: selectedPage == pageNumber ? Colors.grey : Colors.grey[200],
+          //borderRadius: pageNumber == 0 ? BorderRadius.only(topLeft: Radius.circular(5), bottomLeft: Radius.circular(5)) : BorderRadius.only(topRight: Radius.circular(0), bottomRight: Radius.circular(0)),
+          //borderRadius: BorderRadius.only(topRight: Radius.circular(5), bottomRight: Radius.circular(5)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 5),
+        child: Text(
+          text ?? "Tab Button",
+          style: TextStyle(
+              color: selectedPage == pageNumber ? colorCustom : colorCustom,
+              fontSize: 15,
+              fontWeight: FontWeight.bold
+          ),
+        ),
       ),
     );
   }
 }
 
-// Custom Structure for sensor data
-class lopy_sensor{
-  final DateTime m_time;
-  final double m_sensorData;
-
-  lopy_sensor(this.m_time, this.m_sensorData);
+class TempData {
+  TempData(this.day, this.temp);
+  final String day;
+  final double temp;
 }
 
-
-// Unfinished sections with Data Parse
-double vasia = 2.0;
-
-double parse_lopy_temperature () {
-  vasia = vasia + 3;
-  return vasia;
+class LightData {
+  LightData(this.day, this.light);
+  final String day;
+  final int light;
 }
 
-double parse_lopy_light () {
-  vasia = vasia + 5;
-  return vasia;
+class PressureData {
+  PressureData(this.day, this.pressure);
+  final String day;
+  final double pressure;
 }
 
-double parse_lopy_pressure () {
-  vasia = vasia + 7;
-  return vasia;
-}
+class HumData {
+  HumData(this.day, this.hum);
 
-// TODO: Implement Parsing Function
-// Future parse_data(String mode) async {
-//   // Open a connection (testdb should already exist)
-//   final conn = await MySqlConnection.connect(ConnectionSettings(
-//       host: '192.168.43.247',
-//       port: 3306,
-//       user: 'joey_9901',
-//       db: 'wmdb',
-//       password: 'joey_9901'));
-//
-//   // Insert some data
-//   var result = await conn.query(
-//       'insert into users (name, email, age) values (?, ?, ?)',
-//       ['Bob', 'bob@bob.com', 25]);
-//   print('Inserted row id=${result.insertId}');
-//
-//   // Finally, close the connection
-//   await conn.close();
-// }
+  final String day;
+  final int hum;
+}

@@ -1,6 +1,6 @@
 // This is a generated file; do not edit or check into version control.
-FLUTTER_ROOT=D:\Soft\Applications\ASDK\flutter
-FLUTTER_APPLICATION_PATH=C:\Users\nikse\AndroidStudioProjects\weather_mokeys
+FLUTTER_ROOT=C:\src\flutter
+FLUTTER_APPLICATION_PATH=C:\Users\jvult\OneDrive\Documenten\GitHub\weathermonkeys
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_TARGET=lib\main.dart
 FLUTTER_BUILD_DIR=build
